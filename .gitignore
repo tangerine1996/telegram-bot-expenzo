@@ -1,0 +1,5 @@
+.env
+allowed_users.json
+expenses.json
+__pycache__/
+*.pyc
