@@ -48,17 +48,17 @@ def load_user_categories(user_id):
     """Wczytuje kategorie dla konkretnego użytkownika. Jeśli brak, zwraca domyślne."""
     file_path = get_path('categories.json')
     user_id_str = str(user_id)
-    if os.path.exists(file_path):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            try:
-                all_cats = json.load(f)
-                cats = all_cats.get(user_id_str, DEFAULT_CATEGORIES.copy())
-                logging.info(f"Wczytano kategorie dla {user_id_str}: {cats}")
-                return cats
-            except json.JSONDecodeError:
-                logging.error(f"Błąd odczytu {file_path}")
-                return DEFAULT_CATEGORIES.copy()
-    return DEFAULT_CATEGORIES.copy()
+    
+    if not os.path.exists(file_path):
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump({}, f)
+
+    with open(file_path, 'r', encoding='utf-8') as f:
+        try:
+            all_cats = json.load(f)
+            return all_cats.get(user_id_str, DEFAULT_CATEGORIES.copy())
+        except json.JSONDecodeError:
+            return DEFAULT_CATEGORIES.copy()
 
 def save_user_categories(user_id, categories):
     """Zapisuje listę kategorii dla użytkownika."""
@@ -94,56 +94,52 @@ async def post_init(application):
 async def cat_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Zarządza kategoriami użytkownika: add, delete, list."""
     user_id = update.effective_user.id
-    logging.info(f"Odebrano komendę /cat od {user_id}. Argumenty: {context.args}")
     
     if user_id not in load_allowed_users():
-        logging.warning(f"Użytkownik {user_id} nie ma uprawnień do /cat")
         return
 
     if not context.args:
         await update.message.reply_text(
-            "Użycie:\n"
-            "/cat add <nazwa> - dodaje kategorię\n"
-            "/cat delete <nazwa> - usuwa kategorię\n"
-            "/cat list - lista Twoich kategorii"
+            "ℹ️ **Zarządzanie kategoriami:**\n\n"
+            "Wpisz nazwę od razu po komendzie:\n"
+            "• `/cat add Nazwa` - dodaje nową kategorię\n"
+            "• `/cat delete Nazwa` - usuwa kategorię\n"
+            "• `/cat list` - Twoje kategorie\n\n"
+            "Przykład: `/cat add Papierosy`",
+            parse_mode='Markdown'
         )
         return
 
     subcommand = context.args[0].lower()
     user_cats = load_user_categories(user_id)
-    logging.info(f"Obecne kategorie dla {user_id}: {user_cats}")
 
     if subcommand == "add":
         if len(context.args) < 2:
-            await update.message.reply_text("Podaj nazwę kategorii do dodania.")
+            await update.message.reply_text("❌ Podaj nazwę: `/cat add Nazwa`", parse_mode='Markdown')
             return
         new_cat = " ".join(context.args[1:])
         if new_cat in user_cats:
-            await update.message.reply_text(f"Kategoria '{new_cat}' już istnieje.")
+            await update.message.reply_text(f"⚠️ Kategoria '{new_cat}' już istnieje.")
         else:
             user_cats.append(new_cat)
             save_user_categories(user_id, user_cats)
-            await update.message.reply_text(f"Dodano kategorię: {new_cat}")
-            logging.info(f"Dodano kategorię '{new_cat}' dla {user_id}")
+            await update.message.reply_text(f"✅ Dodano kategorię: **{new_cat}**", parse_mode='Markdown')
 
     elif subcommand == "delete":
         if len(context.args) < 2:
-            await update.message.reply_text("Podaj nazwę kategorii do usunięcia.")
+            await update.message.reply_text("❌ Podaj nazwę: `/cat delete Nazwa`", parse_mode='Markdown')
             return
         cat_to_del = " ".join(context.args[1:])
         if cat_to_del in user_cats:
             user_cats.remove(cat_to_del)
             save_user_categories(user_id, user_cats)
-            await update.message.reply_text(f"Usunięto kategorię: {cat_to_del}")
+            await update.message.reply_text(f"🗑️ Usunięto kategorię: **{cat_to_del}**", parse_mode='Markdown')
         else:
-            await update.message.reply_text(f"Nie znaleziono kategorii: {cat_to_del}")
+            await update.message.reply_text(f"❓ Nie znalazłem kategorii: {cat_to_del}")
 
     elif subcommand == "list":
         cats_str = "\n".join([f"• {c}" for c in user_cats])
-        await update.message.reply_text(f"Twoje kategorie:\n{cats_str}")
-    
-    else:
-        await update.message.reply_text("Nieznana podkomenda. Użyj add, delete lub list.")
+        await update.message.reply_text(f"📋 **Twoje kategorie:**\n\n{cats_str}", parse_mode='Markdown')
 
 async def generate_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Generuje raport wydatków z podziałem na kategorie dla danego miesiąca."""
