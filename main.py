@@ -18,15 +18,21 @@ from telegram.ext import (
 # Konfiguracja logowania
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
+# Pobranie katalogu bazowego bota (tam gdzie jest main.py)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def get_path(filename):
+    return os.path.join(BASE_DIR, filename)
+
 # Funkcja do wczytywania uprawnionych ID użytkowników
 def load_allowed_users():
-    file_path = 'allowed_users.json'
+    file_path = get_path('allowed_users.json')
     if os.path.exists(file_path):
         with open(file_path, 'r', encoding='utf-8') as f:
             try:
                 return json.load(f)
             except json.JSONDecodeError:
-                logging.error("Błąd odczytu allowed_users.json. Zwracam pustą listę.")
+                logging.error(f"Błąd odczytu {file_path}. Zwracam pustą listę.")
                 return []
     return []
 
@@ -39,20 +45,23 @@ AMOUNT, CATEGORY, DESCRIPTION, CONFIRM = range(4)
 
 def load_user_categories(user_id):
     """Wczytuje kategorie dla konkretnego użytkownika. Jeśli brak, zwraca domyślne."""
-    file_path = 'categories.json'
+    file_path = get_path('categories.json')
     user_id_str = str(user_id)
     if os.path.exists(file_path):
         with open(file_path, 'r', encoding='utf-8') as f:
             try:
                 all_cats = json.load(f)
-                return all_cats.get(user_id_str, DEFAULT_CATEGORIES.copy())
+                cats = all_cats.get(user_id_str, DEFAULT_CATEGORIES.copy())
+                logging.info(f"Wczytano kategorie dla {user_id_str}: {cats}")
+                return cats
             except json.JSONDecodeError:
+                logging.error(f"Błąd odczytu {file_path}")
                 return DEFAULT_CATEGORIES.copy()
     return DEFAULT_CATEGORIES.copy()
 
 def save_user_categories(user_id, categories):
     """Zapisuje listę kategorii dla użytkownika."""
-    file_path = 'categories.json'
+    file_path = get_path('categories.json')
     user_id_str = str(user_id)
     all_cats = {}
     if os.path.exists(file_path):
@@ -65,6 +74,7 @@ def save_user_categories(user_id, categories):
     all_cats[user_id_str] = categories
     with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(all_cats, f, indent=4, ensure_ascii=False)
+    logging.info(f"Zapisano kategorie dla {user_id_str} do {file_path}")
 
 async def post_init(application):
     """Konfiguruje menu komend widoczne w Telegramie przy starcie bota."""
@@ -151,7 +161,7 @@ async def generate_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("Użyj formatu RRRR-MM lub 'last'. Generuję raport dla obecnego miesiąca.")
 
-    file_path = 'expenses.json'
+    file_path = get_path('expenses.json')
     if not os.path.exists(file_path):
         await update.message.reply_text("Brak zapisanych wydatków.")
         return
@@ -212,7 +222,7 @@ async def list_expenses(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             await update.message.reply_text("Podaj poprawną liczbę. Używam domyślnej wartości 5.")
 
-    file_path = 'expenses.json'
+    file_path = get_path('expenses.json')
     if not os.path.exists(file_path):
         await update.message.reply_text("Brak zapisanych wydatków.")
         return
@@ -327,7 +337,7 @@ async def confirm_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     
     # Wczytywanie istniejących danych
-    file_path = 'expenses.json'
+    file_path = get_path('expenses.json')
     expenses = {}
     if os.path.exists(file_path):
         with open(file_path, 'r', encoding='utf-8') as f:
