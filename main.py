@@ -3,6 +3,7 @@ import json
 import logging
 import pytz
 import datetime
+import sys
 from datetime import datetime as dt
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import (
@@ -78,6 +79,7 @@ def save_user_categories(user_id, categories):
 
 async def post_init(application):
     """Konfiguruje menu komend widoczne w Telegramie przy starcie bota."""
+    logging.info(f"Inicjalizacja bota. Python: {sys.executable}")
     commands = [
         BotCommand("add", "Dodaj nowy wydatek"),
         BotCommand("list", "Lista ostatnich wydatków"),
@@ -87,11 +89,15 @@ async def post_init(application):
         BotCommand("cancel", "Anuluj obecną operację")
     ]
     await application.bot.set_my_commands(commands)
+    logging.info("Menu komend ustawione.")
 
 async def cat_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Zarządza kategoriami użytkownika: add, delete, list."""
     user_id = update.effective_user.id
+    logging.info(f"Odebrano komendę /cat od {user_id}. Argumenty: {context.args}")
+    
     if user_id not in load_allowed_users():
+        logging.warning(f"Użytkownik {user_id} nie ma uprawnień do /cat")
         return
 
     if not context.args:
@@ -105,6 +111,7 @@ async def cat_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     subcommand = context.args[0].lower()
     user_cats = load_user_categories(user_id)
+    logging.info(f"Obecne kategorie dla {user_id}: {user_cats}")
 
     if subcommand == "add":
         if len(context.args) < 2:
@@ -117,6 +124,7 @@ async def cat_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_cats.append(new_cat)
             save_user_categories(user_id, user_cats)
             await update.message.reply_text(f"Dodano kategorię: {new_cat}")
+            logging.info(f"Dodano kategorię '{new_cat}' dla {user_id}")
 
     elif subcommand == "delete":
         if len(context.args) < 2:
