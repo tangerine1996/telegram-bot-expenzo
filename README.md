@@ -1,78 +1,37 @@
-# Telegram Expense Tracker Bot
+# Telegram Expense Bot
 
-A simple and interactive Telegram bot to track personal expenses, categorize them, and generate monthly reports.
+Prosty bot do zarządzania wydatkami na Telegramie, napisany w Pythonie przy użyciu `python-telegram-bot`.
 
-## Features
+## Funkcje
 
-- **Access Control**: Restricted access for specific user IDs (configured in `main.py`).
-- **Interactive Expense Entry**: Use `/add` to start a conversation-based form to log expenses.
-  - Input amount (PLN).
-  - Select category from inline buttons (Food, Transport, Entertainment, Shopping, Other).
-  - Add a short description.
-- **Expense History**: Use `/list [n]` to see your recent transactions.
-- **Monthly Reports**: Use `/report` to see a summary of spending by category.
-  - `/report`: Current month.
-  - `/report last`: Previous month.
-  - `/report YYYY-MM`: Specific month (e.g., `/report 2026-02`).
-- **User Identification**: `/myid` command available for everyone to find their Telegram ID.
-- **Timezone Aware**: All entries are recorded using the `Europe/Warsaw` timezone.
-- **JSON Storage**: Data is saved in a local `expenses.json` file.
+-   **Dodawanie wydatków (`/add`):** Pozwala wprowadzić kwotę, wybrać kategorię i dodać krótki opis.
+-   **Zarządzanie kategoriami (`/cat`):** Każdy użytkownik może mieć własną listę kategorii.
+    -   `/cat add <nazwa>` - dodaje nową kategorię.
+    -   `/cat delete <nazwa>` - usuwa kategorię.
+    -   `/cat list` - wyświetla Twoje kategorie.
+-   **Inteligentne sortowanie:** Przy dodawaniu wydatku kategorie są sortowane od najczęściej używanych do najrzadziej (per użytkownik).
+-   **Lista wydatków (`/list`):** Wyświetla ostatnie transakcje (domyślnie 5, można podać liczbę, np. `/list 10`).
+-   **Raporty miesięczne (`/report`):** Generuje podsumowanie wydatków z podziałem na kategorie dla obecnego miesiąca, poprzedniego (`/report last`) lub konkretnego (`/report 2026-02`).
+-   **Bezpieczeństwo:** Tylko użytkownicy dodani do `allowed_users.json` mogą korzystać z funkcji dodawania i przeglądania danych.
 
-## Prerequisites
+## Wymagania
 
-- Python 3.10+
-- A Telegram Bot Token (from [@BotFather](https://t.me/botfather))
+-   Python 3.10+
+-   Token bota od BotFather
+-   Biblioteki z `requirements.txt`
 
-## Setup
+## Instalacja
 
-1. **Clone the repository** (or copy the files).
+1. Sklonuj repozytorium.
+2. Zainstaluj zależności: `pip install -r requirements.txt`.
+3. Utwórz plik `.env` z tokenem: `TELEGRAM_TOKEN=twoj_token`.
+4. Dodaj swoje Telegram ID do `allowed_users.json` (np. `[123456789]`).
+5. Uruchom bota: `python main.py`.
 
-2. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   pip install pytz
-   ```
+## Struktura plików
 
-3. **Configure Environment**:
-   Create a `.env` file in the root directory and add your bot token:
-   ```env
-   TELEGRAM_TOKEN=your_bot_token_here
-   ```
-
-4. **Authorize Users**:
-   Add authorized Telegram IDs to the `allowed_users.json` file in JSON format:
-   ```json
-   [
-       123456789,
-       987654321
-   ]
-   ```
-
-## Usage
-
-Run the bot using:
-```bash
-python main.py
-```
-
-### Commands
-- `/add` - Start adding a new expense (Authorized only).
-- `/list [number]` - List last N expenses (Authorized only).
-- `/report [YYYY-MM|last]` - Show monthly report (Authorized only).
-- `/myid` - Show your Telegram User ID (Public).
-- `/cancel` - Cancel the current interactive operation.
-
-## Data Structure
-Expenses are stored in `expenses.json` in the following format:
-```json
-{
-    "user_id": 1234567890,
-    "datetime": "2026-03-06 17:45:12",
-    "amount": 42.50,
-    "category": "Food",
-    "description": "Lunch at work"
-}
-```
-
-## License
-MIT
+-   `main.py` - główny kod bota.
+-   `expenses.json` - baza danych wydatków (pogrupowana po `user_id`).
+-   `categories.json` - personalizowane kategorie użytkowników.
+-   `allowed_users.json` - lista ID użytkowników z dostępem.
+-   `.env` - token bota (zignorowany w git).
