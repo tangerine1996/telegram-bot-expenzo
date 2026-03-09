@@ -85,9 +85,12 @@ async def generate_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
     # Filtrowanie po user_id i miesiącu
+    user_id_str = str(user_id)
+    user_expenses = expenses.get(user_id_str, [])
+    
     filtered_expenses = [
-        e for e in expenses 
-        if e.get('user_id') == user_id and e.get('datetime', '').startswith(target_month)
+        e for e in user_expenses 
+        if e.get('datetime', '').startswith(target_month)
     ]
 
     if not filtered_expenses:
@@ -143,7 +146,8 @@ async def list_expenses(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
     # Filtrowanie wydatków dla tego użytkownika
-    user_expenses = [e for e in expenses if e.get('user_id') == user_id]
+    user_id_str = str(user_id)
+    user_expenses = expenses.get(user_id_str, [])
     
     if not user_expenses:
         await update.message.reply_text("Nie znaleziono Twoich wydatków.")
@@ -233,9 +237,9 @@ async def confirm_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Używamy strefy czasowej dla Polski
     poland_tz = pytz.timezone('Europe/Warsaw')
     now = dt.now(poland_tz)
+    user_id_str = str(update.effective_user.id)
     
     expense_data = {
-        "user_id": update.effective_user.id,
         "datetime": now.strftime("%Y-%m-%d %H:%M:%S"),
         "amount": context.user_data['amount'],
         "category": context.user_data['category'],
@@ -244,16 +248,21 @@ async def confirm_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Wczytywanie istniejących danych
     file_path = 'expenses.json'
-    expenses = []
+    expenses = {}
     if os.path.exists(file_path):
         with open(file_path, 'r', encoding='utf-8') as f:
             try:
                 expenses = json.load(f)
+                if not isinstance(expenses, dict):
+                    expenses = {} # Reset if not dict
             except json.JSONDecodeError:
-                expenses = []
+                expenses = {}
     
     # Dodawanie nowego wpisu
-    expenses.append(expense_data)
+    if user_id_str not in expenses:
+        expenses[user_id_str] = []
+    
+    expenses[user_id_str].append(expense_data)
     
     # Zapis do pliku
     with open(file_path, 'w', encoding='utf-8') as f:
