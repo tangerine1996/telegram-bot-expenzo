@@ -281,13 +281,35 @@ async def start_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return AMOUNT
 
 async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Pobiera kwotę i prosi o kategorię."""
+    """Pobiera kwotę i prosi o kategorię. Kategorie są sortowane po częstotliwości użycia."""
     try:
         amount_str = update.message.text.replace(',', '.')
         amount = float(amount_str)
         context.user_data['amount'] = amount
         
-        user_cats = load_user_categories(update.effective_user.id)
+        user_id = update.effective_user.id
+        user_id_str = str(user_id)
+        user_cats = load_user_categories(user_id)
+        
+        # Zliczanie częstotliwości występowania kategorii w historii użytkownika
+        expenses_path = get_path('expenses.json')
+        category_counts = {}
+        if os.path.exists(expenses_path):
+            with open(expenses_path, 'r', encoding='utf-8') as f:
+                try:
+                    all_expenses = json.load(f)
+                    user_history = all_expenses.get(user_id_str, [])
+                    for exp in user_history:
+                        cat = exp.get('category')
+                        if cat in user_cats:
+                            category_counts[cat] = category_counts.get(cat, 0) + 1
+                except json.JSONDecodeError:
+                    pass
+        
+        # Sortowanie kategorii: najpierw według liczebności (malejąco), potem alfabetycznie
+        # Używamy ujemnego licznika, aby posortować malejąco po liczbie, a rosnąco po nazwie
+        user_cats.sort(key=lambda c: (-category_counts.get(c, 0), c))
+        
         keyboard = [[InlineKeyboardButton(cat, callback_data=cat)] for cat in user_cats]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
