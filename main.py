@@ -31,22 +31,101 @@ def load_allowed_users():
     return []
 
 
-# Kategorie do wyboru
-CATEGORIES = ["Jedzenie", "Transport", "Rozrywka", "Zakupy", "Inne"]
+# Kategorie domyślne
+DEFAULT_CATEGORIES = ["Jedzenie", "Transport", "Rozrywka", "Zakupy", "Inne"]
 
 # Stany rozmowy dla ConversationHandler
 AMOUNT, CATEGORY, DESCRIPTION, CONFIRM = range(4)
 
+def load_user_categories(user_id):
+    """Wczytuje kategorie dla konkretnego użytkownika. Jeśli brak, zwraca domyślne."""
+    file_path = 'categories.json'
+    user_id_str = str(user_id)
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            try:
+                all_cats = json.load(f)
+                return all_cats.get(user_id_str, DEFAULT_CATEGORIES.copy())
+            except json.JSONDecodeError:
+                return DEFAULT_CATEGORIES.copy()
+    return DEFAULT_CATEGORIES.copy()
+
+def save_user_categories(user_id, categories):
+    """Zapisuje listę kategorii dla użytkownika."""
+    file_path = 'categories.json'
+    user_id_str = str(user_id)
+    all_cats = {}
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            try:
+                all_cats = json.load(f)
+            except json.JSONDecodeError:
+                all_cats = {}
+    
+    all_cats[user_id_str] = categories
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(all_cats, f, indent=4, ensure_ascii=False)
+
 async def post_init(application):
     """Konfiguruje menu komend widoczne w Telegramie przy starcie bota."""
     commands = [
-        BotCommand("add", "Dodaj nowy wydatek (tylko uprawnieni)"),
-        BotCommand("list", "Lista ostatnich wydatków (np. /list 10)"),
-        BotCommand("report", "Raport miesięczny (np. /report 2026-02 lub /report last)"),
+        BotCommand("add", "Dodaj nowy wydatek"),
+        BotCommand("list", "Lista ostatnich wydatków"),
+        BotCommand("report", "Raport miesięczny"),
+        BotCommand("cat", "Kategorie: /cat add, /cat delete, /cat list"),
         BotCommand("myid", "Pokaż moje Telegram ID"),
         BotCommand("cancel", "Anuluj obecną operację")
     ]
     await application.bot.set_my_commands(commands)
+
+async def cat_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Zarządza kategoriami użytkownika: add, delete, list."""
+    user_id = update.effective_user.id
+    if user_id not in load_allowed_users():
+        return
+
+    if not context.args:
+        await update.message.reply_text(
+            "Użycie:\n"
+            "/cat add <nazwa> - dodaje kategorię\n"
+            "/cat delete <nazwa> - usuwa kategorię\n"
+            "/cat list - lista Twoich kategorii"
+        )
+        return
+
+    subcommand = context.args[0].lower()
+    user_cats = load_user_categories(user_id)
+
+    if subcommand == "add":
+        if len(context.args) < 2:
+            await update.message.reply_text("Podaj nazwę kategorii do dodania.")
+            return
+        new_cat = " ".join(context.args[1:])
+        if new_cat in user_cats:
+            await update.message.reply_text(f"Kategoria '{new_cat}' już istnieje.")
+        else:
+            user_cats.append(new_cat)
+            save_user_categories(user_id, user_cats)
+            await update.message.reply_text(f"Dodano kategorię: {new_cat}")
+
+    elif subcommand == "delete":
+        if len(context.args) < 2:
+            await update.message.reply_text("Podaj nazwę kategorii do usunięcia.")
+            return
+        cat_to_del = " ".join(context.args[1:])
+        if cat_to_del in user_cats:
+            user_cats.remove(cat_to_del)
+            save_user_categories(user_id, user_cats)
+            await update.message.reply_text(f"Usunięto kategorię: {cat_to_del}")
+        else:
+            await update.message.reply_text(f"Nie znaleziono kategorii: {cat_to_del}")
+
+    elif subcommand == "list":
+        cats_str = "\n".join([f"• {c}" for c in user_cats])
+        await update.message.reply_text(f"Twoje kategorie:\n{cats_str}")
+    
+    else:
+        await update.message.reply_text("Nieznana podkomenda. Użyj add, delete lub list.")
 
 async def generate_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Generuje raport wydatków z podziałem na kategorie dla danego miesiąca."""
@@ -194,7 +273,8 @@ async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         amount = float(amount_str)
         context.user_data['amount'] = amount
         
-        keyboard = [[InlineKeyboardButton(cat, callback_data=cat)] for cat in CATEGORIES]
+        user_cats = load_user_categories(update.effective_user.id)
+        keyboard = [[InlineKeyboardButton(cat, callback_data=cat)] for cat in user_cats]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await update.message.reply_text("Wybierz kategorię:", reply_markup=reply_markup)
@@ -308,6 +388,7 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler('myid', my_id))
     application.add_handler(CommandHandler('list', list_expenses))
     application.add_handler(CommandHandler('report', generate_report))
+    application.add_handler(CommandHandler('cat', cat_manager))
     application.add_handler(conv_handler)
     
     print('Bot uruchomiony pomyślnie.')
